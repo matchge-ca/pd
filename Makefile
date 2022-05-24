@@ -201,6 +201,12 @@ BASIC_TEST_PKGS := $(filter-out $(PD_PKG)/tests%,$(TEST_PKGS))
 SUBMODULES := $(filter $(shell find . -iname "go.mod" -exec dirname {} \;),\
 				$(filter-out .,$(shell find . -iname "Makefile" -exec dirname {} \;)))
 
+hua-test: install-tools
+	echo "Hua test for schedule: region-scatter"
+	@$(FAILPOINT_ENABLE)
+	go test -v github.com/tikv/pd/server/schedule || { $(FAILPOINT_DISABLE); exit 1; }
+	@$(FAILPOINT_DISABLE)	
+
 test: install-tools
 	# testing all pkgs...
 	@$(FAILPOINT_ENABLE)
