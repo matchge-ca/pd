@@ -117,7 +117,6 @@ func NewBuilder(desc string, ci ClusterInformer, region *core.RegionInfo, opts .
 			err = errors.Errorf("cannot build operator for region with nil peer")
 
 			if desc == "scatter-region" {
-				fmt.Println("Hello world - scatter-region counter 'nil peer' inc")
 				schedule.scatterCounter.WithLabelValues("fail", "nil-peer").Inc()
 			}
 
@@ -139,7 +138,6 @@ func NewBuilder(desc string, ci ClusterInformer, region *core.RegionInfo, opts .
 	if _, ok := originPeers[originLeaderStoreID]; err == nil && !ok {
 		err = errors.Errorf("cannot build operator for region with no leader")
 		if desc == "scatter-region" {
-			fmt.Println("Hello world - scatter-region counter 'no leader' inc")
 			schedule.scatterCounter.WithLabelValues("fail", "no-leader").Inc()
 		}
 	}
