@@ -496,6 +496,13 @@ func (c *RaftCluster) GetOperatorController() *schedule.OperatorController {
 	return c.coordinator.opController
 }
 
+// SetPrepared set the prepare check to prepared. Only for test purpose.
+func (c *RaftCluster) SetPrepared() {
+	c.coordinator.prepareChecker.Lock()
+	defer c.coordinator.prepareChecker.Unlock()
+	c.coordinator.prepareChecker.prepared = true
+}
+
 // GetRegionScatter returns the region scatter.
 func (c *RaftCluster) GetRegionScatter() *schedule.RegionScatterer {
 	return c.coordinator.regionScatterer
@@ -769,7 +776,7 @@ func (c *RaftCluster) processRegionHeartbeat(region *core.RegionInfo) error {
 	if err != nil {
 		return err
 	}
-	region.Inherit(origin)
+	region.Inherit(origin, c.storeConfigManager.GetStoreConfig().IsEnableRegionBucket())
 
 	c.hotStat.CheckWriteAsync(statistics.NewCheckExpiredItemTask(region))
 	c.hotStat.CheckReadAsync(statistics.NewCheckExpiredItemTask(region))
@@ -1449,7 +1456,7 @@ func (c *RaftCluster) checkStores() {
 						zap.Stringer("store", store.GetMeta()),
 						errs.ZapError(err))
 				}
-			} else {
+			} else if c.IsPrepared() {
 				threshold := c.getThreshold(stores, store)
 				log.Debug("store serving threshold", zap.Uint64("store-id", storeID), zap.Float64("threshold", threshold))
 				regionSize := float64(store.GetRegionSize())
@@ -1478,7 +1485,9 @@ func (c *RaftCluster) checkStores() {
 		offlineStore := store.GetMeta()
 		id := offlineStore.GetId()
 		regionSize := c.core.GetStoreRegionSize(id)
-		c.updateProgress(id, store.GetAddress(), removingAction, float64(regionSize), float64(regionSize), false /* dec */)
+		if c.IsPrepared() {
+			c.updateProgress(id, store.GetAddress(), removingAction, float64(regionSize), float64(regionSize), false /* dec */)
+		}
 		regionCount := c.core.GetStoreRegionCount(id)
 		// If the store is empty, it can be buried.
 		if regionCount == 0 {
@@ -1687,10 +1696,12 @@ func (c *RaftCluster) RemoveTombStoneRecords() error {
 	c.Lock()
 	defer c.Unlock()
 
+	var failedStores []uint64
 	for _, store := range c.GetStores() {
 		if store.IsRemoved() {
 			if c.core.GetStoreRegionCount(store.GetID()) > 0 {
 				log.Warn("skip removing tombstone", zap.Stringer("store", store.GetMeta()))
+				failedStores = append(failedStores, store.GetID())
 				continue
 			}
 			// the store has already been tombstone
@@ -1705,6 +1716,16 @@ func (c *RaftCluster) RemoveTombStoneRecords() error {
 			log.Info("delete store succeeded",
 				zap.Stringer("store", store.GetMeta()))
 		}
+	}
+	var stores string
+	if len(failedStores) != 0 {
+		for i, storeID := range failedStores {
+			stores += fmt.Sprintf("%d", storeID)
+			if i != len(failedStores)-1 {
+				stores += ", "
+			}
+		}
+		return errors.Errorf("failed stores: %v", stores)
 	}
 	return nil
 }
@@ -1834,6 +1855,8 @@ func (c *RaftCluster) getStoresWithoutLabelLocked(region *core.RegionInfo, key, 
 
 // OnStoreVersionChange changes the version of the cluster when needed.
 func (c *RaftCluster) OnStoreVersionChange() {
+	c.RLock()
+	defer c.RUnlock()
 	c.onStoreVersionChangeLocked()
 }
 
