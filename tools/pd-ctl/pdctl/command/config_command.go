@@ -468,9 +468,10 @@ func NewPlacementRulesCommand() *cobra.Command {
 	}
 	ruleGroupDelete := &cobra.Command{
 		Use:   "delete <id>",
-		Short: "delete rule group configuration",
-		Run:   deleteRuleGroupFunc,
+		Short: "delete rule group configuration. Note: this command will be deprecated soon, use <rule-bundle delete> instead",
+		Run:   delRuleBundle,
 	}
+	ruleGroupDelete.Flags().Bool("regexp", false, "match group id by regular expression")
 	ruleGroup.AddCommand(ruleGroupShow, ruleGroupSet, ruleGroupDelete)
 	ruleBundle := &cobra.Command{
 		Use:   "rule-bundle",
@@ -668,12 +669,14 @@ func deleteRuleGroupFunc(cmd *cobra.Command, args []string) {
 		cmd.Println(cmd.UsageString())
 		return
 	}
-	_, err := doRequest(cmd, path.Join(ruleGroupPrefix, args[0]), http.MethodDelete, http.Header{})
+	res, err := doRequest(cmd, path.Join(ruleGroupPrefix, args[0]), http.MethodDelete, http.Header{})
 	if err != nil {
 		cmd.Printf("Failed to remove rule group config: %s \n", err)
 		return
 	}
-	cmd.Println("Success!")
+	// cmd.Println("Success!")
+
+	cmd.Println(res)
 }
 
 func getRuleBundle(cmd *cobra.Command, args []string) {
