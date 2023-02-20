@@ -674,8 +674,6 @@ func deleteRuleGroupFunc(cmd *cobra.Command, args []string) {
 		cmd.Printf("Failed to remove rule group config: %s \n", err)
 		return
 	}
-	// cmd.Println("Success!")
-
 	cmd.Println(res)
 }
 
